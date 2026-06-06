@@ -33,7 +33,7 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurpleAccent),
       ),
-      home: const LoginPage(),
+      home: const Dashboard(),
       debugShowCheckedModeBanner: false,
     );
   }

@@ -29,7 +29,7 @@ class _ShopTileState extends State<ShopTile> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 360,
+      width: 335,
       child: Container(
         margin: EdgeInsets.all(8),
         padding: EdgeInsets.fromLTRB(14,10,14,10),
@@ -68,10 +68,10 @@ class _ShopTileState extends State<ShopTile> {
                       Center(
                         child: Text(
                             widget.title,
-                            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+                            style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
                         ),
                       ),
-                      SizedBox(height:72),
+                      SizedBox(height: 80),
                       Padding(
                         padding: const EdgeInsets.only(bottom:5),
                         child: Align(
@@ -86,7 +86,7 @@ class _ShopTileState extends State<ShopTile> {
                         children: [
                           Container(
                             height: 40,
-                            width: 156,
+                            padding: EdgeInsets.symmetric(horizontal: 64),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               border: Border.fromBorderSide(BorderSide(color: Colors.grey[400]!)),
