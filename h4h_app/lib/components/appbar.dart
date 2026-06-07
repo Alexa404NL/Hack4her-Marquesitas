@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:h4h_app/pages/dashboard.dart';
 import 'package:h4h_app/pages/login.dart';
+import 'package:h4h_app/pages/tu_carrito.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar({super.key});
@@ -47,7 +48,15 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
             ],
           ),
-          Icon(Icons.shopping_cart_outlined, color: Colors.red),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TuCarrito()),
+              );
+            },
+            child: Icon(Icons.shopping_cart_outlined, color: Colors.red),
+          ),
         ],
       ),
       bottom: PreferredSize(
