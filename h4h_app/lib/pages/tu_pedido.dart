@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import 'package:h4h_app/pages/dashboard.dart';
 
@@ -11,54 +14,43 @@ class TuPedido extends StatefulWidget {
 
 class _TuPedidoState extends State<TuPedido> {
   late List<Map<String, dynamic>> pedidoItems;
+  late List<Map<String, dynamic>> suggestionItems;
+
+  Future<List<Map<String, dynamic>>> loadJsonData(filename) async {
+    final String response = await rootBundle.loadString(filename);
+    final dynamic data = jsonDecode(response);
+    
+    if (data is List) {
+      return data.map((item) => Map<String, dynamic>.from(item)).toList();
+    }
+    
+    return [];
+  }
 
   @override
   void initState() {
     super.initState();
-    pedidoItems = [
-      {
-        'title': 'Coca-Cola, Botella Pet 1.25 L, 12 piezas',
-        'picture': 'assets/images/coca.jpg',
-        'quantity': 2,
-        'price': '\$120.00',
-      },
-      {
-        'title': 'Ciel Agua Purificada, Botella Pet 1.00 L, 6 piezas',
-        'picture': 'assets/images/ciel.png',
-        'quantity': 1,
-        'price': '\$45.00',
-      },
-      {
-        'title': 'Topo Chico Agua Mineral, Botella Pet 1.50 L, 6 piezas',
-        'picture': 'assets/images/topo.png',
-        'quantity': 3,
-        'price': '\$150.00',
-      },
-    ];
+    pedidoItems = [];
+    suggestionItems = [];
+    
+    // Load pedido items
+    loadJsonData('assets/data/pedido.json').then((data) {
+      if (mounted) {
+        setState(() {
+          pedidoItems = data;
+        });
+      }
+    });
+    
+    // Load suggestion items
+    loadJsonData('assets/data/suggestions.json').then((data) {
+      if (mounted) {
+        setState(() {
+          suggestionItems = data;
+        });
+      }
+    });
   }
-
-  final List<Map<String, dynamic>> suggestionItems = [
-    {
-      'title': 'Sprite, Botella Pet 1.25 L',
-      'picture': 'assets/images/coca.jpg',
-      'price': '\$35.00',
-    },
-    {
-      'title': 'Fanta Naranja, Botella Pet 1.25 L',
-      'picture': 'assets/images/ciel.png',
-      'price': '\$40.00',
-    },
-    {
-      'title': 'Jarritos, Botella Pet 1.00 L',
-      'picture': 'assets/images/topo.png',
-      'price': '\$25.00',
-    },
-    {
-      'title': 'Maruchan, Ramén Instantáneo',
-      'picture': 'assets/images/coca.jpg',
-      'price': '\$15.00',
-    },
-  ];
 
   void _addToCart(Map<String, dynamic> item) {
     setState(() {
