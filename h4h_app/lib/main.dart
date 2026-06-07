@@ -34,6 +34,9 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurpleAccent),
       ),
       home: const Dashboard(),
+      routes: {
+        '/dashboard': (context) => const Dashboard(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }

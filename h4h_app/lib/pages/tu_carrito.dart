@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:h4h_app/pages/tu_pedido.dart';
-import 'package:lottie/lottie.dart';
-
 
 class TuCarrito extends StatelessWidget {
   const TuCarrito({super.key});
@@ -27,7 +25,7 @@ class TuCarrito extends StatelessWidget {
           children: [
             // Banner for "Pedido Inteligente"
             _buildPedidoInteligenteBanner(context),
-            
+
             // Empty State Container
             Padding(
               padding: const EdgeInsets.all(16),
