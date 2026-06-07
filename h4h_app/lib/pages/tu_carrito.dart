@@ -407,7 +407,7 @@ class _TuCarritoState extends State<TuCarrito> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildPedidoInteligenteBanner(context),
+            // _buildPedidoInteligenteBanner(context),
             _buildAutoOrderSection(),
             if (items.isEmpty)
               Padding(
