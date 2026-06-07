@@ -1,3 +1,5 @@
+import re
+import unicodedata
 import uuid
 from datetime import datetime, timezone
 
@@ -6,6 +8,28 @@ import psycopg2
 from typing import List, Dict, Any, Tuple
 from app.database import get_db_connection
 from app.models import CartItemIn
+
+_DEDUPE_NOISE_WORDS = {"sabor", "original", "presentacion"}
+
+
+def _canonical_title(title: str) -> str:
+    """
+    Canonicalizes a product title for duplicate detection: strips accents,
+    punctuation/hyphen/spacing differences, and marketing noise words, so
+    "Coca - Cola Sin Azúcar" and "Coca-Cola Sin Azúcar" collapse to the same
+    key while "Coca-Cola" vs "Coca-Cola Zero" stay distinct.
+
+    Tested cosine similarity on embeddings as a dedupe signal first — it
+    doesn't separate cleanly ("Coca-Cola" vs "Coca-Cola Sabor Original" =
+    0.925 vs "Coca-Cola" vs "Coca-Cola Zero" = 0.907, genuinely-different
+    products land too close to genuinely-same ones). Text canonicalization
+    is the more reliable signal for "is this the same catalog item".
+    """
+    text = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode().lower()
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    words = [w for w in text.split() if w not in _DEDUPE_NOISE_WORDS]
+    return " ".join(words)
+
 
 def map_product_details(sku: int, name: str, business_unit: str) -> Dict[str, Any]:
     """Map database product to a mock asset picture and price for Flutter UI."""
@@ -120,16 +144,21 @@ def get_vector_suggestions(conn, centroid: List[float], exclude_skus: List[int],
     """Retrieve semantically compatible products from catalog vector using pgvector.
 
     The catalog has many rows sharing the exact same `nombre_sku_solicitado`
-    (different package sizes/SKUs of the same product line), and since
-    map_product_details derives both title and price from that name, they
-    render as visually identical recommendation cards. We over-fetch
-    candidates and dedupe by (title, price) so the user never sees the same
-    card twice in one suggestion set.
+    (different package sizes/SKUs of the same product line, often clustered
+    tightly together by similarity), and since map_product_details derives
+    title from that name, they render as visually identical recommendation
+    cards — cosmetic name variants ("Coca - Cola Sin Azúcar" vs "Coca-Cola
+    Sabor Original") make exact-string matching miss duplicates too. We
+    over-fetch candidates and dedupe by canonical_title (see
+    _canonical_title) so the user never sees the same product twice in one
+    suggestion set. The multiplier is generous (12x): probing this customer's
+    centroid showed only 3 distinct titles in the nearest 20 rows but 18 in
+    the nearest 60 — same-name SKUs cluster together in similarity order.
     """
     cur = conn.cursor()
 
     centroid_str = f"[{','.join(map(str, centroid))}]"
-    fetch_limit = limit * 4
+    fetch_limit = limit * 12
 
     # If there are SKUs to exclude, add the NOT IN clause
     if exclude_skus:
@@ -162,7 +191,11 @@ def get_vector_suggestions(conn, centroid: List[float], exclude_skus: List[int],
     for r in rows:
         sku, name, b_unit, similarity = r
         details = map_product_details(sku, name, b_unit)
-        dedupe_key = (details["title"], details["price"])
+        # Price is NOT part of the key: map_product_details often falls back to
+        # a sku-derived mock price (15 + sku % 85), so identical catalog items
+        # under different SKUs can show different "prices" — title is the real
+        # identity signal here, price is cosmetic noise.
+        dedupe_key = _canonical_title(details["title"])
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
