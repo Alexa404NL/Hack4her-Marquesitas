@@ -111,6 +111,21 @@ class CartStore extends ChangeNotifier {
     await _persist();
   }
 
+  /// Sets [sku]'s quantity to an absolute value — unlike [addItem] (which adds
+  /// on top of what's already there), this is what applying an agent's
+  /// "change quantity to N" suggestion needs.
+  Future<void> setQuantity(int sku, int quantity) async {
+    if (quantity <= 0) {
+      await removeItem(sku);
+      return;
+    }
+    final index = _items.indexWhere((item) => item.sku == sku);
+    if (index == -1) return;
+    _items[index].quantity = quantity;
+    notifyListeners();
+    await _persist();
+  }
+
   Future<void> updateQuantity(int sku, bool increment) async {
     final index = _items.indexWhere((item) => item.sku == sku);
     if (index == -1) return;

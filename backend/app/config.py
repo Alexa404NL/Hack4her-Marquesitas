@@ -10,6 +10,6 @@ class Settings:
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
     DB_NAME: str = os.getenv("DB_NAME", "")
     DB_PORT: str = os.getenv("DB_PORT", "10751")
-    API_GEMINI: str = os.getenv("API_GEMINI", "")
+    API_KEY: str = os.getenv("API_KEY", "")
 
 settings = Settings()

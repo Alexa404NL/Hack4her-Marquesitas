@@ -45,3 +45,35 @@ class RlFeedbackRequest(BaseModel):
 
 class RlFeedbackResponse(BaseModel):
     status: str
+
+
+class AutoOrderRequest(BaseModel):
+    customer_id: str
+    current_cart: Optional[List[CartItemIn]] = []
+
+
+class AutoOrderItem(BaseModel):
+    sku: int
+    title: str
+    picture: str
+    price: str
+    cart_quantity: int
+    suggested_quantity: int
+    change_type: str  # "new" | "increased" | "decreased" | "same"
+    reason: str
+
+
+class AutoOrderResponse(BaseModel):
+    customer_id: str
+    items: List[AutoOrderItem]
+    summary: str
+
+
+class AgentFeedbackRequest(BaseModel):
+    customer_id: Optional[str] = None
+    rating: int
+    comment: Optional[str] = None
+
+
+class AgentFeedbackResponse(BaseModel):
+    status: str

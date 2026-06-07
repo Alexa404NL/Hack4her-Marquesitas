@@ -7,8 +7,18 @@ from app.models import (
     SaveOrderResponse,
     RlFeedbackRequest,
     RlFeedbackResponse,
+    AutoOrderRequest,
+    AutoOrderResponse,
+    AgentFeedbackRequest,
+    AgentFeedbackResponse,
 )
-from app.services import generate_pedido_inteligente, save_order, save_rl_feedback
+from app.services import (
+    generate_pedido_inteligente,
+    save_order,
+    save_rl_feedback,
+    generate_auto_order,
+    save_agent_feedback,
+)
 
 app = FastAPI(
     title="Hack4Her Marquesitas Backend",
@@ -66,6 +76,31 @@ def post_save_order(payload: SaveOrderRequest):
 def post_rl_feedback(payload: RlFeedbackRequest):
     try:
         save_rl_feedback(payload.state, payload.action, payload.reward, payload.customer_id)
+        return {"status": "ok"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+@app.post("/api/pedido-automatico", response_model=AutoOrderResponse)
+def post_auto_order(payload: AutoOrderRequest):
+    try:
+        return generate_auto_order(customer_id=payload.customer_id, current_cart=payload.current_cart or [])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+@app.post("/api/agent-feedback", response_model=AgentFeedbackResponse)
+def post_agent_feedback(payload: AgentFeedbackRequest):
+    try:
+        save_agent_feedback(payload.customer_id, payload.rating, payload.comment)
         return {"status": "ok"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

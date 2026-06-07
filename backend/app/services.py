@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 
 import numpy as np
 import psycopg2
-from typing import List, Dict, Any, Tuple
+from pydantic import BaseModel
+from typing import List, Dict, Any, Optional, Tuple
+from langchain_openai import ChatOpenAI
+from app.config import settings
 from app.database import get_db_connection
 from app.models import CartItemIn
 
@@ -367,6 +370,186 @@ def save_rl_feedback(state: List[float], action: int, reward: float, customer_id
             """INSERT INTO rl_experiences (state, action, reward, customer_id)
                VALUES (%s, %s, %s, %s)""",
             (state, action, reward, customer_id),
+        )
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Auto-order agent (LangChain + Gemini)
+# ---------------------------------------------------------------------------
+
+class _AutoOrderLLMItem(BaseModel):
+    title: str
+    suggested_quantity: int
+    reason: str
+
+
+class _AutoOrderLLMPlan(BaseModel):
+    items: List[_AutoOrderLLMItem]
+    summary: str
+
+
+_AUTO_ORDER_PROMPT = """Eres un agente de re-pedido para un cliente recurrente de una tienda B2B de bebidas.
+
+Productos que el cliente ha comprado antes (nombre: cantidad promedio por pedido):
+{history_lines}
+
+Productos que el cliente ya tiene en su carrito actual (nombre: cantidad):
+{cart_lines}
+
+Tarea: arma una propuesta de pedido para hoy. Para cada producto que aparezca en
+cualquiera de las dos listas de arriba (sin repetir), decide la cantidad que
+recomendarías para este pedido y da una razón breve en español (máx. 20 palabras),
+por ejemplo si conviene subir la cantidad respecto a su promedio o a lo que ya
+tiene en el carrito, y por qué. No inventes productos que no estén en las listas.
+Termina con un resumen de tu estrategia general (máx. 2 frases, en español).
+"""
+
+
+def _build_auto_order_candidates(
+    history: List[Dict[str, Any]], current_cart: List[CartItemIn]
+) -> Dict[str, Dict[str, Any]]:
+    """Maps canonical_title -> candidate details, merging purchase history with the live cart.
+
+    Keying by _canonical_title (the same dedupe signal used for recommendation
+    cards) means SKU variants of one product line collapse into a single
+    candidate — so the agent reasons about "Coca-Cola", not three near-duplicate
+    SKU rows of it.
+    """
+    candidates: Dict[str, Dict[str, Any]] = {}
+    for item in history:
+        key = _canonical_title(item["title"])
+        candidates[key] = {
+            "sku": item["sku"],
+            "title": item["title"],
+            "picture": item["picture"],
+            "price": item["price"],
+            "history_quantity": item["quantity"],
+            "cart_quantity": 0,
+        }
+    for item in current_cart:
+        key = _canonical_title(item.title)
+        if key in candidates:
+            candidates[key]["cart_quantity"] = item.quantity
+        else:
+            candidates[key] = {
+                "sku": item.sku,
+                "title": item.title,
+                "picture": map_product_details(item.sku, item.title, "")["picture"],
+                "price": item.price,
+                "history_quantity": 0,
+                "cart_quantity": item.quantity,
+            }
+    return candidates
+
+
+def generate_auto_order(customer_id: str, current_cart: List[CartItemIn]) -> Dict[str, Any]:
+    """
+    Runs a LangChain + Gemini agent that proposes a re-order plan from purchase
+    history and the live cart, with per-item suggested quantities and reasons.
+
+    The LLM only ever picks from a server-built candidate list (history + cart
+    items, deduped by canonical title) — it cannot hallucinate SKUs/prices,
+    those stay authoritative from the DB. `change_type` is derived by comparing
+    the agent's suggested_quantity against what's already in the cart, which is
+    exactly the "proposed change" the UI highlights for accept/reject.
+    """
+    conn = get_db_connection()
+    try:
+        history = get_customer_history(conn, customer_id, limit=10)
+    finally:
+        conn.close()
+
+    if not history and not current_cart:
+        raise ValueError("No hay historial de compras ni carrito para generar un pedido automático")
+
+    candidates = _build_auto_order_candidates(history, current_cart)
+
+    history_lines = "\n".join(
+        f"- {c['title']}: {c['history_quantity']}"
+        for c in candidates.values() if c["history_quantity"] > 0
+    ) or "(sin historial de compras)"
+    cart_lines = "\n".join(
+        f"- {c['title']}: {c['cart_quantity']}"
+        for c in candidates.values() if c["cart_quantity"] > 0
+    ) or "(carrito vacío)"
+
+    llm = ChatOpenAI(
+        model="openai/gpt-4o-mini",
+        api_key=settings.API_KEY,
+        base_url="https://openrouter.ai/api/v1",
+        temperature=0.3,
+    )
+    structured_llm = llm.with_structured_output(_AutoOrderLLMPlan)
+    prompt = _AUTO_ORDER_PROMPT.format(history_lines=history_lines, cart_lines=cart_lines)
+
+    try:
+        plan = structured_llm.invoke(prompt)
+    except Exception as exc:
+        raise RuntimeError(f"El agente de pedido automático no está disponible: {exc}") from exc
+
+    items = []
+    for llm_item in plan.items:
+        candidate = candidates.get(_canonical_title(llm_item.title))
+        if candidate is None:
+            continue  # ignore anything outside the candidate list (no hallucinated SKUs)
+
+        cart_qty = candidate["cart_quantity"]
+        suggested_qty = max(1, llm_item.suggested_quantity)
+        if cart_qty == 0:
+            change_type = "new"
+        elif suggested_qty > cart_qty:
+            change_type = "increased"
+        elif suggested_qty < cart_qty:
+            change_type = "decreased"
+        else:
+            change_type = "same"
+
+        items.append({
+            "sku": candidate["sku"],
+            "title": candidate["title"],
+            "picture": candidate["picture"],
+            "price": candidate["price"],
+            "cart_quantity": cart_qty,
+            "suggested_quantity": suggested_qty,
+            "change_type": change_type,
+            "reason": llm_item.reason.strip(),
+        })
+
+    return {"customer_id": customer_id, "items": items, "summary": plan.summary.strip()}
+
+
+def save_agent_feedback(customer_id: Optional[str], rating: int, comment: Optional[str] = None) -> None:
+    """
+    Persists "how useful was the agent" feedback for the auto-order feature.
+
+    Creates `agent_feedback` on first use (CREATE TABLE IF NOT EXISTS is cheap
+    and idempotent) instead of requiring a separate manual migration step,
+    matching how lightweight the rest of this feedback plumbing is.
+    """
+    if not (1 <= rating <= 5):
+        raise ValueError("rating must be between 1 and 5")
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS agent_feedback (
+                id BIGSERIAL PRIMARY KEY,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                customer_id TEXT,
+                rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+                comment TEXT
+            );
+            """
+        )
+        cur.execute(
+            "INSERT INTO agent_feedback (customer_id, rating, comment) VALUES (%s, %s, %s)",
+            (customer_id, rating, comment),
         )
         conn.commit()
         cur.close()

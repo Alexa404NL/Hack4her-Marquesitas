@@ -5,3 +5,4 @@ pandas==2.2.2
 python-dotenv==1.0.1
 pydantic==2.7.4
 numpy==1.26.4
+langchain-openai==1.1.12

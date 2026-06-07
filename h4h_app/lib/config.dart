@@ -16,4 +16,10 @@ class AppConfig {
 
   /// Save-order endpoint (same FastAPI backend)
   static const String ordersUrl = '$apiBaseUrl/api/orders';
+
+  /// Auto-order agent endpoint (LangChain + Gemini, same FastAPI backend)
+  static const String autoOrderUrl = '$apiBaseUrl/api/pedido-automatico';
+
+  /// "How useful was the agent" feedback endpoint (same FastAPI backend)
+  static const String agentFeedbackUrl = '$apiBaseUrl/api/agent-feedback';
 }
