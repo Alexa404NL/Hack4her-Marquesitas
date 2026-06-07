@@ -1,7 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from app.models import PedidoInteligenteRequest, PedidoInteligenteResponse
-from app.services import generate_pedido_inteligente
+from app.models import (
+    PedidoInteligenteRequest,
+    PedidoInteligenteResponse,
+    SaveOrderRequest,
+    SaveOrderResponse,
+    RlFeedbackRequest,
+    RlFeedbackResponse,
+)
+from app.services import generate_pedido_inteligente, save_order, save_rl_feedback
 
 app = FastAPI(
     title="Hack4Her Marquesitas Backend",
@@ -39,6 +46,29 @@ def post_pedido_inteligente(payload: PedidoInteligenteRequest):
             current_cart_skus=payload.current_cart_skus or []
         )
         return data
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+@app.post("/api/orders", response_model=SaveOrderResponse)
+def post_save_order(payload: SaveOrderRequest):
+    try:
+        return save_order(customer_id=payload.customer_id, items=payload.items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+@app.post("/api/rl/feedback", response_model=RlFeedbackResponse)
+def post_rl_feedback(payload: RlFeedbackRequest):
+    try:
+        save_rl_feedback(payload.state, payload.action, payload.reward, payload.customer_id)
+        return {"status": "ok"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         import traceback
         traceback.print_exc()

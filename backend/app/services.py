@@ -1,7 +1,11 @@
+import uuid
+from datetime import datetime, timezone
+
 import numpy as np
 import psycopg2
 from typing import List, Dict, Any, Tuple
 from app.database import get_db_connection
+from app.models import CartItemIn
 
 def map_product_details(sku: int, name: str, business_unit: str) -> Dict[str, Any]:
     """Map database product to a mock asset picture and price for Flutter UI."""
@@ -113,11 +117,20 @@ def get_embeddings_by_skus(conn, skus: List[int]) -> List[Tuple[int, List[float]
     return embeddings
 
 def get_vector_suggestions(conn, centroid: List[float], exclude_skus: List[int], limit: int = 5) -> List[Dict[str, Any]]:
-    """Retrieve semantically compatible products from catalog vector using pgvector."""
+    """Retrieve semantically compatible products from catalog vector using pgvector.
+
+    The catalog has many rows sharing the exact same `nombre_sku_solicitado`
+    (different package sizes/SKUs of the same product line), and since
+    map_product_details derives both title and price from that name, they
+    render as visually identical recommendation cards. We over-fetch
+    candidates and dedupe by (title, price) so the user never sees the same
+    card twice in one suggestion set.
+    """
     cur = conn.cursor()
-    
+
     centroid_str = f"[{','.join(map(str, centroid))}]"
-    
+    fetch_limit = limit * 4
+
     # If there are SKUs to exclude, add the NOT IN clause
     if exclude_skus:
         format_strings = ','.join(['%s'] * len(exclude_skus))
@@ -129,7 +142,7 @@ def get_vector_suggestions(conn, centroid: List[float], exclude_skus: List[int],
             ORDER BY embedding <=> %s::vector ASC
             LIMIT %s;
         """
-        params = (centroid_str, *exclude_skus, centroid_str, limit)
+        params = (centroid_str, *exclude_skus, centroid_str, fetch_limit)
     else:
         query = """
             SELECT sku_solicitado, nombre_sku_solicitado, business_unit,
@@ -138,18 +151,25 @@ def get_vector_suggestions(conn, centroid: List[float], exclude_skus: List[int],
             ORDER BY embedding <=> %s::vector ASC
             LIMIT %s;
         """
-        params = (centroid_str, centroid_str, limit)
-        
+        params = (centroid_str, centroid_str, fetch_limit)
+
     cur.execute(query, params)
     rows = cur.fetchall()
     cur.close()
-    
+
     suggestions = []
+    seen = set()
     for r in rows:
         sku, name, b_unit, similarity = r
         details = map_product_details(sku, name, b_unit)
+        dedupe_key = (details["title"], details["price"])
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
         suggestions.append(details)
-        
+        if len(suggestions) >= limit:
+            break
+
     return suggestions
 
 def generate_pedido_inteligente(customer_id: str, current_cart_skus: List[int] = []) -> Dict[str, Any]:
@@ -231,5 +251,91 @@ def generate_pedido_inteligente(customer_id: str, current_cart_skus: List[int] =
             "pedido_sugerido": history,
             "sugerencias": suggestions
         }
+    finally:
+        conn.close()
+
+
+def save_order(customer_id: str, items: List[CartItemIn]) -> Dict[str, Any]:
+    """
+    Persist a confirmed cart as a new order.
+
+    Writes into the same `orders` / `order_details` tables the historical
+    dataset uses (status_final='Entregado'), so generate_pedido_inteligente
+    picks this order up as part of the customer's history on the very next
+    request — no extra plumbing needed for the recommendation engine.
+    """
+    if not items:
+        raise ValueError("Cannot save an empty order")
+
+    id_pedido = f"APP-{uuid.uuid4().hex[:16].upper()}"
+    now = datetime.now(timezone.utc).isoformat()
+    total = round(sum(_parse_price(item.price) * item.quantity for item in items), 2)
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO orders (
+                id_pedido, customer_id, pais, id_businessunit, business_unit,
+                cedis, fecha_pedido, fecha_entrega, status_final,
+                valor_pedido, SubTotal, Total
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            """,
+            (
+                id_pedido, customer_id, None, None, "App Movil",
+                None, now, now, "Entregado",
+                total, total, total,
+            ),
+        )
+
+        for index, item in enumerate(items):
+            id_linea = f"{id_pedido}-{index}"
+            cur.execute(
+                """
+                INSERT INTO order_details (
+                    id_linea, id_pedido, sku_solicitado, nombre_sku_solicitado,
+                    Quantity, Status
+                ) VALUES (%s, %s, %s, %s, %s, %s);
+                """,
+                (id_linea, id_pedido, item.sku, item.title, item.quantity, "Entregado"),
+            )
+
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
+    return {"status": "ok", "id_pedido": id_pedido, "total": total}
+
+
+def _parse_price(price: str) -> float:
+    """Parses the Flutter '$120.00'-style price string into a float."""
+    return float(price.replace("$", "").replace(",", "").strip() or 0)
+
+
+def save_rl_feedback(state: List[float], action: int, reward: float, customer_id: str | None = None) -> None:
+    """
+    Persist one recommendation-rating experience into `rl_experiences`.
+
+    Kept intentionally lightweight (plain INSERT, no Stable-Baselines3 model
+    load) so the request path stays fast — the nightly offline trainer
+    (rl_agent.py train_offline) is what turns these rows into a better model.
+    """
+    if not (0 <= action <= 4):
+        raise ValueError("action must be between 0 and 4")
+    if not (-1.0 <= reward <= 1.0):
+        raise ValueError("reward must be between -1.0 and 1.0")
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO rl_experiences (state, action, reward, customer_id)
+               VALUES (%s, %s, %s, %s)""",
+            (state, action, reward, customer_id),
+        )
+        conn.commit()
+        cur.close()
     finally:
         conn.close()

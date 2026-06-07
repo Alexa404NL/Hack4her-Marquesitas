@@ -1,11 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:h4h_app/config.dart';
 import 'package:h4h_app/pages/dashboard.dart';
 import 'package:http/http.dart' as http;
 
 Future<void> login(context) async {
-  final response = await http.get(Uri.parse('http://10.22.237.139:8000/login'));
+  final response = await http.get(Uri.parse('${AppConfig.apiBaseUrl}/login'));
   debugPrint(response.body);
   final data = jsonDecode(response.body);
   

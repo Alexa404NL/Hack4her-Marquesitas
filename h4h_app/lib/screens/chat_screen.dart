@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:h4h_app/config.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -26,7 +27,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://10.22.237.139:3000/api/chat'), // Cambia por tu URL real
+        Uri.parse('${AppConfig.chatBaseUrl}/api/chat'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'prompt': text}),
       );

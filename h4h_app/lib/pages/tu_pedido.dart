@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:h4h_app/config.dart';
 import 'package:lottie/lottie.dart';
 import 'package:h4h_app/pages/dashboard.dart';
 
@@ -43,7 +44,7 @@ class _TuPedidoState extends State<TuPedido> {
     try {
       final skusToSend = currentCartSkus ?? pedidoItems.map((e) => (e['sku'] as num?)?.toInt() ?? 0).where((s) => s != 0).toList();
       final response = await http.post(
-        Uri.parse('http://10.22.237.139:8000/api/pedido-inteligente'),
+        Uri.parse('${AppConfig.apiBaseUrl}/api/pedido-inteligente'),
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',
         },
@@ -110,6 +111,25 @@ class _TuPedidoState extends State<TuPedido> {
         });
       }
     });
+  }
+
+  /// Send RL reward signal to the backend after the user interacts with the cart.
+  /// [action] is the strategy index chosen by the RL model (received from the backend).
+  /// [reward] is +1.0 for full accept, +0.5 for partial modify, -1.0 for discard.
+  Future<void> _sendRlFeedback({
+    required List<double> state,
+    required int action,
+    required double reward,
+  }) async {
+    try {
+      await http.post(
+        Uri.parse(AppConfig.rlTelemetryUrl),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode({'state': state, 'action': action, 'reward': reward}),
+      ).timeout(const Duration(seconds: 3));
+    } catch (e) {
+      debugPrint('RL telemetry failed (non-critical): $e');
+    }
   }
 
   void _addToCart(Map<String, dynamic> item) {
