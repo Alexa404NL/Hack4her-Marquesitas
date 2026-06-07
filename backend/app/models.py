@@ -45,3 +45,49 @@ class RlFeedbackRequest(BaseModel):
 
 class RlFeedbackResponse(BaseModel):
     status: str
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Goals (Metas) models
+# ──────────────────────────────────────────────────────────────────────────────
+
+class GoalCreate(BaseModel):
+    title: str
+    goal_type: str  # 'spending' | 'volume' | 'frequency' | 'exploration' | 'habit'
+    target_value: float
+    target_unit: str  # 'pesos' | 'units' | 'orders' | 'products' | 'weeks'
+    is_autosuggest: Optional[bool] = False
+
+
+class GoalOut(BaseModel):
+    id: int
+    title: str
+    goal_type: str
+    target_value: float
+    target_unit: str
+    is_autosuggest: bool
+    is_completed: bool
+    current_progress: float
+    created_at: str
+    completed_at: Optional[str] = None
+
+
+class SuggestedGoal(BaseModel):
+    title: str
+    goal_type: str
+    target_value: float
+    target_unit: str
+    reason: str
+
+
+class GoalListResponse(BaseModel):
+    goals: List[GoalOut]
+
+
+class SuggestedGoalsResponse(BaseModel):
+    suggestions: List[SuggestedGoal]
+
+
+class GoalCreateResponse(BaseModel):
+    status: str
+    id: int

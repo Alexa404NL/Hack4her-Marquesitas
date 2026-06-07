@@ -7,8 +7,19 @@ from app.models import (
     SaveOrderResponse,
     RlFeedbackRequest,
     RlFeedbackResponse,
+    GoalCreate,
+    GoalListResponse,
+    GoalCreateResponse,
+    SuggestedGoalsResponse,
 )
-from app.services import generate_pedido_inteligente, save_order, save_rl_feedback
+from app.services import (
+    generate_pedido_inteligente,
+    save_order,
+    save_rl_feedback,
+    get_all_goals,
+    create_goal,
+    get_suggested_goals,
+)
 
 app = FastAPI(
     title="Hack4Her Marquesitas Backend",
@@ -69,6 +80,50 @@ def post_rl_feedback(payload: RlFeedbackRequest):
         return {"status": "ok"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+
+# ── Goals (Metas) endpoints ───────────────────────────────────────────────────
+
+@app.get("/api/goals", response_model=GoalListResponse)
+def list_goals():
+    """Return all stored goals (hackathon: no customer_id filter)."""
+    try:
+        goals = get_all_goals()
+        return {"goals": goals}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+
+@app.post("/api/goals", response_model=GoalCreateResponse)
+def post_create_goal(payload: GoalCreate):
+    """Create a new goal."""
+    try:
+        result = create_goal(
+            title=payload.title,
+            goal_type=payload.goal_type,
+            target_value=payload.target_value,
+            target_unit=payload.target_unit,
+            is_autosuggest=payload.is_autosuggest or False,
+        )
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+
+@app.get("/api/goals/suggestions", response_model=SuggestedGoalsResponse)
+def list_suggested_goals():
+    """Return AI-suggested goals derived from aggregate purchase patterns."""
+    try:
+        suggestions = get_suggested_goals()
+        return {"suggestions": suggestions}
     except Exception as e:
         import traceback
         traceback.print_exc()
