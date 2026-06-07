@@ -23,6 +23,8 @@ class _TuCarritoState extends State<TuCarrito> {
   List<int> _lastFetchedSkus = [];
   bool _loadingRecommendations = false;
   bool _saving = false;
+  int _selectedRating = 0;
+  bool _feedbackSent = false;
 
   @override
   void initState() {
@@ -78,6 +80,8 @@ class _TuCarritoState extends State<TuCarrito> {
           setState(() {
             _recommendations = List<Map<String, dynamic>>.from(data['sugerencias']);
             _lastFetchedSkus = currentSkus;
+            _selectedRating = 0;
+            _feedbackSent = false;
           });
         }
       }
@@ -111,6 +115,48 @@ class _TuCarritoState extends State<TuCarrito> {
         duration: const Duration(seconds: 1),
       ),
     );
+  }
+
+  /// Sends a star rating (1-5) for the current recommendation set as an RL
+  /// reward signal — stored in `rl_experiences` and consumed by the nightly
+  /// offline trainer (rl_agent.py) to make future recs better.
+  Future<void> _submitRecommendationFeedback() async {
+    if (_selectedRating == 0 || _feedbackSent) return;
+
+    final reward = (_selectedRating - 3) / 2.0; // 1★→-1.0 … 3★→0.0 … 5★→+1.0
+    final now = DateTime.now();
+    final state = <double>[
+      (_cart.subtotal / 1000).clamp(0.0, 1.0),
+      0.5,
+      now.weekday / 6.0,
+      now.hour / 23.0,
+      (_cart.totalItemCount / 20).clamp(0.0, 1.0),
+    ];
+
+    try {
+      await http.post(
+        Uri.parse(AppConfig.rlTelemetryUrl),
+        headers: <String, String>{'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode(<String, dynamic>{
+          'state': state,
+          'action': 0, 
+          'reward': reward,
+          'customer_id': _customerId,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (mounted) {
+        setState(() => _feedbackSent = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Gracias! Esto ayuda a mejorar tus próximas recomendaciones'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('RL feedback failed (non-critical): $e');
+    }
   }
 
   Future<void> _saveOrder() async {
@@ -289,6 +335,8 @@ class _TuCarritoState extends State<TuCarrito> {
                           },
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      _buildRecommendationFeedback(),
                     ],
                   ),
                 ),
@@ -373,6 +421,59 @@ class _TuCarritoState extends State<TuCarrito> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRecommendationFeedback() {
+    if (_feedbackSent) {
+      return Row(
+        children: [
+          const Icon(Icons.check_circle, color: Colors.green, size: 18),
+          const SizedBox(width: 6),
+          Text(
+            '¡Gracias por tu valoración!',
+            style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '¿Qué tan útiles fueron estas recomendaciones?',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            ...List.generate(5, (i) {
+              final starValue = i + 1;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedRating = starValue),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    starValue <= _selectedRating ? Icons.star : Icons.star_border,
+                    color: const Color.fromARGB(255, 109, 46, 177),
+                    size: 26,
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(width: 8),
+            if (_selectedRating > 0)
+              TextButton(
+                onPressed: _submitRecommendationFeedback,
+                child: const Text(
+                  'Enviar',
+                  style: TextStyle(color: Color.fromARGB(255, 109, 46, 177), fontWeight: FontWeight.bold),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 
