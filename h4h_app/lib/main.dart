@@ -14,6 +14,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      builder: (context, child) {
+        return SafeArea(
+          top: false,  // Set to true if you want to avoid the notch area as well
+          bottom: true, // Prevents overlap with the system navigation bar
+          child: child!,
+        );
+      },
       title: 'H4H App',
       theme: ThemeData(
         // This is the theme of your application.

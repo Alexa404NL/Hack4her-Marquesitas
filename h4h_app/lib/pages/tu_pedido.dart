@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:h4h_app/pages/dashboard.dart';
 
-class TuPedido extends StatelessWidget {
+class TuPedido extends StatefulWidget {
   const TuPedido({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Sample data - replace with actual data source
-    final List<Map<String, dynamic>> pedidoItems = [
+  State<TuPedido> createState() => _TuPedidoState();
+}
+
+class _TuPedidoState extends State<TuPedido> {
+  late List<Map<String, dynamic>> pedidoItems;
+
+  @override
+  void initState() {
+    super.initState();
+    pedidoItems = [
       {
         'title': 'Coca-Cola, Botella Pet 1.25 L, 12 piezas',
         'picture': 'assets/images/coca.jpg',
@@ -28,7 +35,50 @@ class TuPedido extends StatelessWidget {
         'price': '\$150.00',
       },
     ];
+  }
 
+  final List<Map<String, dynamic>> suggestionItems = [
+    {
+      'title': 'Sprite, Botella Pet 1.25 L',
+      'picture': 'assets/images/coca.jpg',
+      'price': '\$35.00',
+    },
+    {
+      'title': 'Fanta Naranja, Botella Pet 1.25 L',
+      'picture': 'assets/images/ciel.png',
+      'price': '\$40.00',
+    },
+    {
+      'title': 'Jarritos, Botella Pet 1.00 L',
+      'picture': 'assets/images/topo.png',
+      'price': '\$25.00',
+    },
+    {
+      'title': 'Maruchan, Ramén Instantáneo',
+      'picture': 'assets/images/coca.jpg',
+      'price': '\$15.00',
+    },
+  ];
+
+  void _addToCart(Map<String, dynamic> item) {
+    setState(() {
+      pedidoItems.add({
+        'title': item['title'],
+        'picture': item['picture'],
+        'quantity': 1,
+        'price': item['price'],
+      });
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${item['title']} agregado al carrito'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color.fromARGB(255, 242, 242, 242),
       appBar: AppBar(
@@ -81,6 +131,39 @@ class TuPedido extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: _buildOrderSummary(pedidoItems),
+            ),
+            // Product Suggestions Section
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Quizás te interese',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 160,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: suggestionItems.length,
+                      itemBuilder: (context, index) {
+                        return SuggestionTile(
+                          title: suggestionItems[index]['title'],
+                          picture: suggestionItems[index]['picture'],
+                          price: suggestionItems[index]['price'],
+                          onAdd: () => _addToCart(suggestionItems[index]),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
             // Checkout Button
             Padding(
@@ -348,6 +431,115 @@ class _CompactPedidoTileState extends State<CompactPedidoTile> {
                   ],
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SuggestionTile extends StatelessWidget {
+  final String title;
+  final String picture;
+  final String price;
+  final VoidCallback onAdd;
+
+  const SuggestionTile({
+    super.key,
+    required this.title,
+    required this.picture,
+    required this.price,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 12),
+      width: 130,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Product Image
+          Container(
+            width: double.infinity,
+            height: 80,
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+              color: Colors.grey[100],
+            ),
+            child: Image.asset(
+              picture,
+              fit: BoxFit.cover,
+            ),
+          ),
+          // Product Info
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const Spacer(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        price,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color.fromARGB(255, 109, 46, 177),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: onAdd,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: Color.fromARGB(255, 109, 46, 177),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.add,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],
