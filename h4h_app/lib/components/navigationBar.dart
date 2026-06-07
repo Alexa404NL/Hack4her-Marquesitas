@@ -14,46 +14,27 @@ class StaticBottomNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
+      backgroundColor: const Color(0xfffff8f8),
+      elevation: 8,
       currentIndex: selectedIndex,
-      selectedItemColor: Colors.red,
-      unselectedItemColor: Colors.black,
+      selectedItemColor: const Color(0xffff3b35),
+      unselectedItemColor: const Color(0xff9e9e9e),
+      selectedFontSize: 16,
+      unselectedFontSize: 16,
+      selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
       onTap: onItemSelected,
-      items: [
-        _buildNavItem(
-          icon: Icons.home,
-          label: 'Inicio',
-          isSelected: selectedIndex == 0,
-        ),
-        _buildNavItem(
-          icon: Icons.apps,
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.home, size: 34), label: 'Inicio'),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.apps_rounded, size: 32),
           label: 'Productos',
-          isSelected: selectedIndex == 1,
         ),
-        _buildNavItem(
-          icon: Icons.book,
+        BottomNavigationBarItem(
+          icon: Icon(Icons.bookmark, size: 32),
           label: 'Pedidos',
-          isSelected: selectedIndex == 2,
         ),
-        _buildNavItem(
-          icon: Icons.menu,
-          label: 'Menú',
-          isSelected: selectedIndex == 3,
-        ),
+        BottomNavigationBarItem(icon: Icon(Icons.menu, size: 34), label: 'Menú'),
       ],
-    );
-  }
-
-  BottomNavigationBarItem _buildNavItem({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-  }) {
-    return BottomNavigationBarItem(
-      icon: Container(
-        margin: const EdgeInsets.only(top: 3),
-        child: Icon(icon, size: 30),
-      ),
-      label: label,
     );
   }
 }

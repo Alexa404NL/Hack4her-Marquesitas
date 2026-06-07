@@ -5,12 +5,17 @@ class ImageSlider extends StatefulWidget {
   const ImageSlider({super.key});
 
   @override
-  State<ImageSlider> createState() => _PageViewState();
+  State<ImageSlider> createState() => _ImageSliderState();
 }
 
-class _PageViewState extends State<ImageSlider> {
-  final PageController _pageController = PageController(viewportFraction: 0.9);
+class _ImageSliderState extends State<ImageSlider> {
+  final PageController _pageController = PageController(viewportFraction: 0.88);
   int _currentIndex = 0;
+
+  static const _images = [
+    'assets/images/img2.png',
+    'assets/images/img3.png',
+  ];
 
   @override
   void dispose() {
@@ -23,47 +28,36 @@ class _PageViewState extends State<ImageSlider> {
     return Column(
       children: [
         SizedBox(
-          height: 90,
-          child: PageView(
+          height: 106,
+          child: PageView.builder(
             controller: _pageController,
-            onPageChanged: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
+            itemCount: _images.length,
+            onPageChanged: (index) => setState(() => _currentIndex = index),
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(_images[index], fit: BoxFit.cover),
+                ),
+              );
             },
-            children: [
-              //_buildImage('assets/images/img1.png'),
-              _buildImage('assets/images/img2.png'),
-              _buildImage('assets/images/img3.png'),
-            ],
           ),
         ),
-
-        const SizedBox(height: 25),
-
+        const SizedBox(height: 24),
         AnimatedSmoothIndicator(
           activeIndex: _currentIndex,
-          count: 2,
-          effect: ExpandingDotsEffect(
-            dotHeight: 8,
-            dotWidth: 8,
+          count: _images.length,
+          effect: const ExpandingDotsEffect(
+            dotHeight: 9,
+            dotWidth: 9,
             expansionFactor: 3,
-            activeDotColor: Color.fromARGB(255, 219, 7, 35),
-            dotColor: Color.fromARGB(255, 215, 213, 209),
+            activeDotColor: Color(0xffe30625),
+            dotColor: Color(0xffd8d6d2),
             spacing: 10,
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildImage(String path) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.asset(path, fit: BoxFit.cover),
-      ),
     );
   }
 }

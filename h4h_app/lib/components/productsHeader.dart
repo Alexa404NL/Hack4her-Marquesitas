@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-/// Widget con el título "Pedido Fácil" a la izquierda
-/// y "Ver todos →" a la derecha con estilo rojo.
 Widget productsHeader() {
   return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+    padding: const EdgeInsets.symmetric(horizontal: 8),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
+      children: const [
         Text(
           'Pedido Fácil',
-          style: GoogleFonts.lato(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
             color: Colors.black,
           ),
         ),
@@ -21,18 +18,17 @@ Widget productsHeader() {
           children: [
             Text(
               'Ver todos',
-              style: GoogleFonts.lato(
-                fontSize: 18,
+              style: TextStyle(
+                fontSize: 22,
                 fontWeight: FontWeight.w500,
-                color: Color.fromARGB(255, 219, 7, 35),
-                
+                color: Color(0xffe30625),
               ),
             ),
-            SizedBox(width: 13),
+            SizedBox(width: 10),
             Icon(
               Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: Color.fromARGB(255, 219, 7, 35),
+              size: 20,
+              color: Color(0xffe30625),
             ),
           ],
         ),

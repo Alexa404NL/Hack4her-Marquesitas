@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:h4h_app/pages/dashboard.dart';
 import 'package:h4h_app/pages/login.dart';
 import 'package:h4h_app/pages/tu_carrito.dart';
+
+const _brandRed = Color(0xffff3b35);
+const _ink = Color(0xff231f20);
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar({super.key});
@@ -9,44 +11,81 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
+      automaticallyImplyLeading: false,
       backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      elevation: 0,
+      titleSpacing: 16,
+      toolbarHeight: 92,
       title: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top:10),
-                child: Text("Punto de venta", style: TextStyle(fontSize: 12, color: Colors.grey)),
-              ),
-              DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isDense: true,
-                  value: null,
-                  hint: Text(
-                    "Abarrotes Worms",
-                    style: TextStyle(fontSize: 21, color: Colors.black),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Punto de venta',
+                  style: TextStyle(
+                    color: Color(0xff9b9b9b),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
                   ),
-                  icon: Icon(Icons.keyboard_arrow_down, color: Colors.red),
-                  dropdownColor: Colors.white,
-                  items: [
-                    DropdownMenuItem(
-                      value: "logout",
-                      child: Text("Cerrar Sesión", style: TextStyle(fontSize: 18, color: Colors.black)),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value == "logout") {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
-                      );
-                      debugPrint("logout");
-                    }
-                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isDense: true,
+                    value: null,
+                    hint: const Text(
+                      'Abarrotes Worms',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: _brandRed,
+                      size: 30,
+                    ),
+                    dropdownColor: Colors.white,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'logout',
+                        child: Text('Cerrar sesión'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == 'logout') {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (context) => const LoginPage(),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Carrito',
+            icon: const Icon(
+              Icons.shopping_cart_outlined,
+              color: _brandRed,
+              size: 32,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TuCarrito()),
+              );
+            },
           ),
           GestureDetector(
             onTap: () {
@@ -60,22 +99,36 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       bottom: PreferredSize(
-        preferredSize: Size.fromHeight(60),
+        preferredSize: const Size.fromHeight(74),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Container(
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.fromBorderSide(BorderSide(color: Colors.grey[400]!, width:0.5))
-            ),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: SizedBox(
+            height: 48,
             child: TextField(
+              style: const TextStyle(fontSize: 20, color: _ink),
               decoration: InputDecoration(
                 hintText: 'Buscar',
-                prefixIcon: Icon(Icons.search),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                hintStyle: const TextStyle(
+                  color: Color(0xff5c4c4c),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w400,
+                ),
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.only(left: 14, right: 10),
+                  child: Icon(Icons.search, color: Color(0xff5c4c4c), size: 32),
+                ),
+                prefixIconConstraints: const BoxConstraints(minWidth: 58),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: EdgeInsets.zero,
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(9),
+                  borderSide: const BorderSide(color: Color(0xffcfcfcf)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(9),
+                  borderSide: const BorderSide(color: _brandRed, width: 1.2),
+                ),
               ),
             ),
           ),
@@ -85,5 +138,5 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => Size.fromHeight(kToolbarHeight + 60);
+  Size get preferredSize => const Size.fromHeight(166);
 }
