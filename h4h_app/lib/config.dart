@@ -2,7 +2,7 @@
 /// When your WiFi/IP changes, update ONLY [backendIp] here.
 class AppConfig {
   // ─── Change this one value when your local IP changes ───────────────────────
-  static const String backendIp = '10.22.139.200';
+  static const String backendIp = '10.22.224.14';
   // ────────────────────────────────────────────────────────────────────────────
 
   /// FastAPI backend  (port 8000)
@@ -22,4 +22,7 @@ class AppConfig {
 
   /// "How useful was the agent" feedback endpoint (same FastAPI backend)
   static const String agentFeedbackUrl = '$apiBaseUrl/api/agent-feedback';
+  /// Goals (Metas) endpoints
+  static const String goalsUrl = '$apiBaseUrl/api/goals';
+  static const String goalsSuggestionsUrl = '$apiBaseUrl/api/goals/suggestions';
 }

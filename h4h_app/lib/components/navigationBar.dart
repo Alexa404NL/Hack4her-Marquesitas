@@ -35,9 +35,14 @@ class StaticBottomNavigationBar extends StatelessWidget {
           isSelected: selectedIndex == 2,
         ),
         _buildNavItem(
+          icon: Icons.flag_rounded,
+          label: 'Metas',
+          isSelected: selectedIndex == 3,
+        ),
+        _buildNavItem(
           icon: Icons.menu,
           label: 'Menú',
-          isSelected: selectedIndex == 3,
+          isSelected: selectedIndex == 4,
         ),
       ],
     );
