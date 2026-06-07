@@ -676,7 +676,7 @@ def get_suggested_goals() -> List[Dict[str, Any]]:
         cur.execute("""
             SELECT AVG(monthly_total)
             FROM (
-                SELECT DATE_TRUNC('month', fecha_pedido) AS month,
+                SELECT DATE_TRUNC('month', fecha_pedido::timestamp) AS month,
                        SUM(Total) AS monthly_total
                 FROM orders
                 WHERE status_final = 'Entregado'
