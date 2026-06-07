@@ -11,6 +11,10 @@ from app.models import (
     AutoOrderResponse,
     AgentFeedbackRequest,
     AgentFeedbackResponse,
+    GoalCreate,
+    GoalListResponse,
+    GoalCreateResponse,
+    SuggestedGoalsResponse,
 )
 from app.services import (
     generate_pedido_inteligente,
@@ -18,6 +22,9 @@ from app.services import (
     save_rl_feedback,
     generate_auto_order,
     save_agent_feedback,
+    get_all_goals,
+    create_goal,
+    get_suggested_goals,
 )
 
 app = FastAPI(
@@ -92,6 +99,15 @@ def post_auto_order(payload: AutoOrderRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+# ── Goals (Metas) endpoints ───────────────────────────────────────────────────
+
+@app.get("/api/goals", response_model=GoalListResponse)
+def list_goals():
+    """Return all stored goals (hackathon: no customer_id filter)."""
+    try:
+        goals = get_all_goals()
+        return {"goals": goals}
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -104,6 +120,31 @@ def post_agent_feedback(payload: AgentFeedbackRequest):
         return {"status": "ok"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/goals", response_model=GoalCreateResponse)
+def post_create_goal(payload: GoalCreate):
+    """Create a new goal."""
+    try:
+        result = create_goal(
+            title=payload.title,
+            goal_type=payload.goal_type,
+            target_value=payload.target_value,
+            target_unit=payload.target_unit,
+            is_autosuggest=payload.is_autosuggest or False,
+        )
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+
+@app.get("/api/goals/suggestions", response_model=SuggestedGoalsResponse)
+def list_suggested_goals():
+    """Return AI-suggested goals derived from aggregate purchase patterns."""
+    try:
+        suggestions = get_suggested_goals()
+        return {"suggestions": suggestions}
     except Exception as e:
         import traceback
         traceback.print_exc()

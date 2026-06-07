@@ -532,13 +532,12 @@ def save_agent_feedback(customer_id: Optional[str], rating: int, comment: Option
     """
     if not (1 <= rating <= 5):
         raise ValueError("rating must be between 1 and 5")
-
+    
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS agent_feedback (
+        cur.execute("""
+                CREATE TABLE IF NOT EXISTS agent_feedback (
                 id BIGSERIAL PRIMARY KEY,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 customer_id TEXT,
@@ -555,3 +554,192 @@ def save_agent_feedback(customer_id: Optional[str], rating: int, comment: Option
         cur.close()
     finally:
         conn.close()
+    
+    
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Goals (Metas) service functions
+# ──────────────────────────────────────────────────────────────────────────────
+
+def get_all_goals() -> List[Dict[str, Any]]:
+    """Fetch all goals from the database (no customer_id filter — hackathon scope)."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, title, goal_type, target_value, target_unit,
+                   is_autosuggest, is_completed, current_progress,
+                   created_at, completed_at
+            FROM goals
+            ORDER BY created_at DESC
+            LIMIT 50;
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        goals = []
+        for r in rows:
+            (gid, title, goal_type, target_value, target_unit,
+             is_autosuggest, is_completed, current_progress,
+             created_at, completed_at) = r
+            goals.append({
+                "id": gid,
+                "title": title,
+                "goal_type": goal_type,
+                "target_value": float(target_value),
+                "target_unit": target_unit,
+                "is_autosuggest": bool(is_autosuggest),
+                "is_completed": bool(is_completed),
+                "current_progress": float(current_progress),
+                "created_at": created_at.isoformat() if created_at else "",
+                "completed_at": completed_at.isoformat() if completed_at else None,
+            })
+        return goals
+    finally:
+        conn.close()
+
+
+def create_goal(title: str, goal_type: str, target_value: float,
+                target_unit: str, is_autosuggest: bool = False) -> Dict[str, Any]:
+    """Insert a new goal row and return its id."""
+    # Use the VARCHAR customer_id string that exists in the orders table
+    # so the FK constraint is satisfied. For this hackathon, all goals
+    # are attributed to this single test account.
+    PLACEHOLDER_CUSTOMER_ID = '5.183610e+17'
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO goals
+                (customer_id, title, goal_type, target_value, target_unit, is_autosuggest)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (PLACEHOLDER_CUSTOMER_ID, title, goal_type, target_value, target_unit, is_autosuggest),
+        )
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return {"status": "ok", "id": new_id}
+    finally:
+        conn.close()
+
+
+def get_suggested_goals() -> List[Dict[str, Any]]:
+    """
+    Generate smart goal suggestions from aggregate purchase patterns across ALL orders.
+    Falls back gracefully to hardcoded sensible defaults if the DB is unavailable.
+    """
+    HARDCODED_SUGGESTIONS = [
+        {
+            "title": "Alcanzar $5,000 en compras este mes",
+            "goal_type": "spending",
+            "target_value": 5000.0,
+            "target_unit": "pesos",
+            "reason": "Las tiendas similares gastan en promedio $4,800 al mes — ¡estás muy cerca!",
+        },
+        {
+            "title": "Hacer 3 pedidos esta semana",
+            "goal_type": "frequency",
+            "target_value": 3.0,
+            "target_unit": "orders",
+            "reason": "Los revendedores más exitosos hacen pedidos frecuentes para mantener inventario fresco.",
+        },
+        {
+            "title": "Comprar 50 unidades de bebidas",
+            "goal_type": "volume",
+            "target_value": 50.0,
+            "target_unit": "units",
+            "reason": "Las bebidas son la categoría más vendida — abastécete mejor.",
+        },
+        {
+            "title": "Probar 5 productos nuevos",
+            "goal_type": "exploration",
+            "target_value": 5.0,
+            "target_unit": "products",
+            "reason": "Diversificar tu catálogo puede aumentar tus ventas hasta un 20%.",
+        },
+        {
+            "title": "Mantener pedidos consistentes por 4 semanas",
+            "goal_type": "habit",
+            "target_value": 4.0,
+            "target_unit": "weeks",
+            "reason": "La consistencia en pedidos te garantiza mejor disponibilidad de producto.",
+        },
+    ]
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Average monthly spend across all delivered orders
+        cur.execute("""
+            SELECT AVG(monthly_total)
+            FROM (
+                SELECT DATE_TRUNC('month', fecha_pedido) AS month,
+                       SUM(Total) AS monthly_total
+                FROM orders
+                WHERE status_final = 'Entregado'
+                GROUP BY month
+            ) AS monthly;
+        """)
+        avg_spend_row = cur.fetchone()
+        avg_spend = float(avg_spend_row[0]) if avg_spend_row and avg_spend_row[0] else 4000.0
+
+        # Average weekly order frequency
+        cur.execute("""
+            SELECT COUNT(*) / NULLIF(
+                EXTRACT(WEEK FROM MAX(fecha_pedido)) - EXTRACT(WEEK FROM MIN(fecha_pedido)), 0
+            )
+            FROM orders WHERE status_final = 'Entregado';
+        """)
+        freq_row = cur.fetchone()
+        avg_freq = float(freq_row[0]) if freq_row and freq_row[0] else 2.0
+
+        cur.close()
+        conn.close()
+
+        suggested_spend = round(avg_spend * 1.15 / 500) * 500  # bump 15%, round to nearest 500
+        suggested_orders = max(3, round(avg_freq) + 1)
+
+        return [
+            {
+                "title": f"Alcanzar ${suggested_spend:,.0f} en compras este mes",
+                "goal_type": "spending",
+                "target_value": float(suggested_spend),
+                "target_unit": "pesos",
+                "reason": f"El promedio mensual de la red es ${avg_spend:,.0f} — sube un 15% y supéralos.",
+            },
+            {
+                "title": f"Hacer {suggested_orders} pedidos esta semana",
+                "goal_type": "frequency",
+                "target_value": float(suggested_orders),
+                "target_unit": "orders",
+                "reason": "Los revendedores de alto rendimiento hacen pedidos frecuentes para stock fresco.",
+            },
+            {
+                "title": "Comprar 50 unidades de bebidas",
+                "goal_type": "volume",
+                "target_value": 50.0,
+                "target_unit": "units",
+                "reason": "Las bebidas lideran ventas — asegúrate de tener suficiente inventario.",
+            },
+            {
+                "title": "Descubrir 5 productos nuevos",
+                "goal_type": "exploration",
+                "target_value": 5.0,
+                "target_unit": "products",
+                "reason": "Diversificar tu catálogo puede aumentar tus ventas hasta un 20%.",
+            },
+            {
+                "title": "Mantener pedidos 4 semanas seguidas",
+                "goal_type": "habit",
+                "target_value": 4.0,
+                "target_unit": "weeks",
+                "reason": "La consistencia garantiza mejor disponibilidad de producto.",
+            },
+        ]
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return HARDCODED_SUGGESTIONS
