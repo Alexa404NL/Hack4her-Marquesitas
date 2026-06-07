@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import 'package:h4h_app/pages/dashboard.dart';
 
+import 'package:http/http.dart' as http;
+
 class TuPedido extends StatefulWidget {
   const TuPedido({super.key});
 
@@ -33,6 +35,41 @@ class _TuPedidoState extends State<TuPedido> {
     pedidoItems = [];
     suggestionItems = [];
     
+    // Fetch dynamic smart order and suggestions from FastAPI backend
+    fetchPedidoInteligente();
+  }
+
+  Future<void> fetchPedidoInteligente() async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.22.237.139:8000/api/pedido-inteligente'),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(<String, dynamic>{
+          'customer_id': '5.183610e+17', // Test customer ID with robust history
+          'current_cart_skus': [], // Can be populated with items currently in cart
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            pedidoItems = List<Map<String, dynamic>>.from(data['pedido_sugerido']);
+            suggestionItems = List<Map<String, dynamic>>.from(data['sugerencias']);
+          });
+        }
+      } else {
+        throw Exception('Backend returned status ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint("FastAPI offline or error: $e. Falling back to local assets.");
+      _loadLocalJsonFallback();
+    }
+  }
+
+  void _loadLocalJsonFallback() {
     // Load pedido items
     loadJsonData('assets/data/pedido.json').then((data) {
       if (mounted) {
