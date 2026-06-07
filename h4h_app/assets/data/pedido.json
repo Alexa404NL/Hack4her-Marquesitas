@@ -1,20 +1,23 @@
 [
-    {
-        "title": "Coca-Cola, Botella Pet 1.25 L, 12 piezas",
-        "picture": "assets/images/coca.jpg",
-        "quantity": 2,
-        "price": "$120.00"
-      },
-      {
-        "title": "Ciel Agua Purificada, Botella Pet 1.00 L, 6 piezas",
-        "picture": "assets/images/ciel.png",
-        "quantity": 1,
-        "price": "$45.00"
-      },
-      {
-        "title": "Topo Chico Agua Mineral, Botella Pet 1.50 L, 6 piezas",
-        "picture": "assets/images/topo.png",
-        "quantity": 3,
-        "price": "$150.00"
-      }
+  {
+    "sku": 6267870000000000000,
+    "title": "Coca-Cola, Botella Pet 1.25 L, 12 piezas",
+    "picture": "assets/images/coca.jpg",
+    "quantity": 2,
+    "price": "$120.00"
+  },
+  {
+    "sku": 7512120000000000000,
+    "title": "Ciel Agua Purificada, Botella Pet 1.00 L, 6 piezas",
+    "picture": "assets/images/ciel.png",
+    "quantity": 1,
+    "price": "$45.00"
+  },
+  {
+    "sku": 8512690000000000000,
+    "title": "Topo Chico Agua Mineral, Botella Pet 1.50 L, 6 piezas",
+    "picture": "assets/images/topo.png",
+    "quantity": 3,
+    "price": "$150.00"
+  }
 ]

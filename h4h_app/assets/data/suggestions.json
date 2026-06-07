@@ -1,22 +1,26 @@
 [
-    {
-      "title": "Sprite, Botella Pet 1.25 L",
-      "picture": "assets/images/coca.jpg",
-      "price": "$35.00"
-    },
-    {
-      "title": "Fanta Naranja, Botella Pet 1.25 L",
-      "picture": "assets/images/ciel.png",
-      "price": "$40.00"
-    },
-    {
-      "title": "Jarritos, Botella Pet 1.00 L",
-      "picture": "assets/images/topo.png",
-      "price": "$25.00"
-    },
-    {
-      "title": "Maruchan, Ramén Instantáneo",
-      "picture": "assets/images/coca.jpg",
-      "price": "$15.00"
-    }
+  {
+    "sku": 2411100000000000000,
+    "title": "Sprite, Botella Pet 1.25 L",
+    "picture": "assets/images/coca.jpg",
+    "price": "$35.00"
+  },
+  {
+    "sku": 670380000000000000,
+    "title": "Fanta Naranja, Botella Pet 1.25 L",
+    "picture": "assets/images/ciel.png",
+    "price": "$40.00"
+  },
+  {
+    "sku": 331065000000000000,
+    "title": "Jarritos, Botella Pet 1.00 L",
+    "picture": "assets/images/topo.png",
+    "price": "$25.00"
+  },
+  {
+    "sku": 329184000000000000,
+    "title": "Maruchan, Ramón Instantáneo",
+    "picture": "assets/images/coca.jpg",
+    "price": "$15.00"
+  }
 ]

@@ -39,8 +39,9 @@ class _TuPedidoState extends State<TuPedido> {
     fetchPedidoInteligente();
   }
 
-  Future<void> fetchPedidoInteligente() async {
+  Future<void> fetchPedidoInteligente({List<int>? currentCartSkus}) async {
     try {
+      final skusToSend = currentCartSkus ?? pedidoItems.map((e) => (e['sku'] as num?)?.toInt() ?? 0).where((s) => s != 0).toList();
       final response = await http.post(
         Uri.parse('http://10.22.237.139:8000/api/pedido-inteligente'),
         headers: <String, String>{
@@ -48,7 +49,7 @@ class _TuPedidoState extends State<TuPedido> {
         },
         body: jsonEncode(<String, dynamic>{
           'customer_id': '5.183610e+17', // Test customer ID with robust history
-          'current_cart_skus': [], // Can be populated with items currently in cart
+          'current_cart_skus': skusToSend,
         }),
       ).timeout(const Duration(seconds: 4));
 
@@ -56,7 +57,9 @@ class _TuPedidoState extends State<TuPedido> {
         final Map<String, dynamic> data = jsonDecode(response.body);
         if (mounted) {
           setState(() {
-            pedidoItems = List<Map<String, dynamic>>.from(data['pedido_sugerido']);
+            if (pedidoItems.isEmpty) {
+              pedidoItems = List<Map<String, dynamic>>.from(data['pedido_sugerido']);
+            }
             suggestionItems = List<Map<String, dynamic>>.from(data['sugerencias']);
           });
         }
@@ -65,8 +68,28 @@ class _TuPedidoState extends State<TuPedido> {
       }
     } catch (e) {
       debugPrint("FastAPI offline or error: $e. Falling back to local assets.");
-      _loadLocalJsonFallback();
+      if (pedidoItems.isEmpty) {
+        _loadLocalJsonFallback();
+      }
     }
+  }
+
+  void _updateQuantity(int index, bool increment) {
+    setState(() {
+      if (increment) {
+        pedidoItems[index]['quantity'] = (pedidoItems[index]['quantity'] as int) + 1;
+      } else {
+        if ((pedidoItems[index]['quantity'] as int) > 1) {
+          pedidoItems[index]['quantity'] = (pedidoItems[index]['quantity'] as int) - 1;
+        } else {
+          pedidoItems.removeAt(index);
+        }
+      }
+    });
+    
+    // Re-fetch suggestions dynamically based on new cart items
+    final currentSkus = pedidoItems.map((e) => (e['sku'] as num?)?.toInt() ?? 0).where((s) => s != 0).toList();
+    fetchPedidoInteligente(currentCartSkus: currentSkus);
   }
 
   void _loadLocalJsonFallback() {
@@ -90,14 +113,30 @@ class _TuPedidoState extends State<TuPedido> {
   }
 
   void _addToCart(Map<String, dynamic> item) {
+    final sku = (item['sku'] as num?)?.toInt() ?? 0;
     setState(() {
-      pedidoItems.add({
-        'title': item['title'],
-        'picture': item['picture'],
-        'quantity': 1,
-        'price': item['price'],
-      });
+      final existingIndex = pedidoItems.indexWhere((element) => 
+        (sku != 0 && (element['sku'] as num?)?.toInt() == sku) || 
+        (sku == 0 && element['title'] == item['title'])
+      );
+      
+      if (existingIndex != -1) {
+        pedidoItems[existingIndex]['quantity'] = (pedidoItems[existingIndex]['quantity'] as int) + 1;
+      } else {
+        pedidoItems.add({
+          'sku': item['sku'],
+          'title': item['title'],
+          'picture': item['picture'],
+          'quantity': 1,
+          'price': item['price'],
+        });
+      }
     });
+
+    // Re-fetch suggestions dynamically
+    final currentSkus = pedidoItems.map((e) => (e['sku'] as num?)?.toInt() ?? 0).where((s) => s != 0).toList();
+    fetchPedidoInteligente(currentCartSkus: currentSkus);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('${item['title']} agregado al carrito'),
@@ -150,6 +189,8 @@ class _TuPedidoState extends State<TuPedido> {
                         picture: pedidoItems[index]['picture'],
                         quantity: pedidoItems[index]['quantity'],
                         price: pedidoItems[index]['price'],
+                        onIncrement: () => _updateQuantity(index, true),
+                        onDecrement: () => _updateQuantity(index, false),
                       );
                     },
                   ),
@@ -232,8 +273,10 @@ class _TuPedidoState extends State<TuPedido> {
     int totalItems = 0;
     
     for (var item in items) {
-      totalItems += item['quantity'] as int;
-      total += double.parse(item['price'].toString().replaceAll('\$', '').replaceAll(',', ''));
+      int qty = item['quantity'] as int;
+      totalItems += qty;
+      double itemPrice = double.parse(item['price'].toString().replaceAll('\$', '').replaceAll(',', ''));
+      total += itemPrice * qty;
     }
 
     return Container(
@@ -315,11 +358,13 @@ class _TuPedidoState extends State<TuPedido> {
   }
 }
 
-class CompactPedidoTile extends StatefulWidget {
+class CompactPedidoTile extends StatelessWidget {
   final String title;
   final String picture;
   final int quantity;
   final String price;
+  final VoidCallback onIncrement;
+  final VoidCallback onDecrement;
 
   const CompactPedidoTile({
     super.key,
@@ -327,20 +372,9 @@ class CompactPedidoTile extends StatefulWidget {
     required this.picture,
     required this.quantity,
     required this.price,
+    required this.onIncrement,
+    required this.onDecrement,
   });
-
-  @override
-  State<CompactPedidoTile> createState() => _CompactPedidoTileState();
-}
-
-class _CompactPedidoTileState extends State<CompactPedidoTile> {
-  late int count;
-
-  @override
-  void initState() {
-    super.initState();
-    count = widget.quantity;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -370,7 +404,7 @@ class _CompactPedidoTileState extends State<CompactPedidoTile> {
               color: Colors.grey[100],
             ),
             child: Image.asset(
-              widget.picture,
+              picture,
               fit: BoxFit.cover,
             ),
           ),
@@ -381,7 +415,7 @@ class _CompactPedidoTileState extends State<CompactPedidoTile> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.title,
+                  title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -398,11 +432,7 @@ class _CompactPedidoTileState extends State<CompactPedidoTile> {
                     Row(
                       children: [
                         GestureDetector(
-                          onTap: () {
-                            if (count > 1) {
-                              setState(() => count--);
-                            }
-                          },
+                          onTap: onDecrement,
                           child: Container(
                             width: 28,
                             height: 28,
@@ -419,7 +449,7 @@ class _CompactPedidoTileState extends State<CompactPedidoTile> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          count.toString(),
+                          quantity.toString(),
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -427,9 +457,7 @@ class _CompactPedidoTileState extends State<CompactPedidoTile> {
                         ),
                         const SizedBox(width: 8),
                         GestureDetector(
-                          onTap: () {
-                            setState(() => count++);
-                          },
+                          onTap: onIncrement,
                           child: Container(
                             width: 28,
                             height: 28,
@@ -450,7 +478,7 @@ class _CompactPedidoTileState extends State<CompactPedidoTile> {
                     ),
                     // Price
                     Text(
-                      widget.price,
+                      price,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
